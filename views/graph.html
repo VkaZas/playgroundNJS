@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+    body, html {
+        height: 100%;
+        width: 100%;
+    }
+    .link {
+        stroke: #000;
+        stroke-width: 1.5px;
+    }
+
+    .node {
+        cursor: move;
+        fill: #ccc;
+        stroke: #000;
+        stroke-width: 1.5px;
+    }
+
+    .node.fixed {
+        fill: #f00;
+    }
+
+    .file-bubble {
+        height: 200px;
+        width: 150px;
+        border: 1px solid black;
+        background-color: white;
+    }
+
+    .node.fixed .file-bubble {
+        background-color: #00B7FF;
+    }
+
+</style>
+<body>
+<script src="//d3js.org/d3.v3.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+<script>
+
+    var width = document.body.clientWidth,
+        height = document.body.clientHeight;
+
+    var force = d3.layout.force()
+        .size([width, height])
+        .charge(-400)
+        .linkDistance(300)
+        .linkStrength(.5)
+        .on("tick", tick);
+
+    var drag = force.drag()
+        .on("dragstart", dragstart);
+
+    var svg = d3.select("body").append("svg")
+        .attr("width", width)
+        .attr("height", height);
+
+    var link = svg.selectAll(".link"),
+        node = svg.selectAll(".node"),
+        fObject = svg.selectAll("foreignObject"),
+        fileBubble = svg.selectAll(".file-bubble");
+
+    d3.json("data/graph.json", function(error, graph) {
+        if (error) throw error;
+
+        force
+            .nodes(graph.nodes)
+            .links(graph.links)
+            .start();
+
+        //arrow
+        svg.append("svg:defs")
+            .append("svg:marker")
+            .attr("id", "arrow")
+            .attr("viewBox", "0 -5 10 10")
+            .attr("refX", 10)
+            .attr("refY", 0)
+            .attr("markerWidth", 10)
+            .attr("markerHeight", 10)
+            .attr("orient", "auto")
+            .append("path")
+            .attr("d", "M0,-5L10,0L0,5")
+            .attr("class","arrowHead");
+
+        link = link.data(graph.links)
+            .enter().append("line")
+            .attr("class", "link")
+            .attr("stroke-width", 1)
+            .attr("stroke", "black")
+            .attr("marker-end", "url(#arrow)");
+
+        node = node.data(graph.nodes)
+            .enter().append("g")
+            .attr("class", "node")
+            .attr("transform", function (d) {
+                return "translate(" + d.x + "," + d.y + ")";
+            })
+            .on("dblclick", dblclick)
+            .call(drag);
+
+
+
+        node.append("foreignObject");
+        fObject = d3.selectAll("foreignObject");
+        fileBubble = fObject.append("xhtml:div")
+            .attr("class", "file-bubble");
+
+        fileBubble.append("p")
+            .html(function (d) {
+                var classItems = '';
+                var i = 0;
+                for (i = 0; i < d.classes.length; i++) {
+                    classItems += '<li>' + d.classes[i] + '</li>';
+                }
+                return '<p>' + d.fileName + '</p>' + '<ul>' + classItems + '</ul>';
+            });
+
+        // node.append("circle")
+        //     .attr("r", 8)
+        //     .attr("stroke", "black");
+
+    });
+
+    function tick() {
+        link.attr("x1", function(d) { return d.source.x; })
+            .attr("y1", function(d) { return d.source.y; })
+            .attr("x2", function(d) { return d.target.x; })
+            .attr("y2", function(d) { return d.target.y; });
+
+        node.attr("transform", function (d) {
+            return "translate(" + d.x + "," + d.y + ")";
+        });
+    }
+
+    function dblclick(d) {
+        d3.select(this).classed("fixed", d.fixed = false);
+    }
+
+    function dragstart(d) {
+        d3.select(this).classed("fixed", d.fixed = true);
+        console.log(d.fileName);
+        $.get('http://localhost:3002/test', {name: d.fileName}, function (data) {
+            console.log(data);
+        }, 'string');
+    }
+
+</script>
