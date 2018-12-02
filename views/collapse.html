@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<!-- Compiled and minified CSS -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+<!-- Compiled and minified JavaScript -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+
+
+<style>
+
+    body, html {
+        height: 100%;
+        width: 100%;
+    }
+    .link {
+        fill: green;
+        stroke: #000;
+        stroke-width: 1.5px;
+    }
+
+    .node {
+        cursor: move;
+        fill: #ccc;
+        stroke: #000;
+        stroke-width: 1.5px;
+    }
+
+    .node.fixed {
+        fill: #f00;
+    }
+
+    .file-bubble {
+        height: 100px;
+        width: 200px;
+        background-color: white;
+        /*border: 1px solid black;*/
+    }
+
+    .node.fixed .file-bubble {
+        background-color: #00B7FF;
+    }
+
+
+</style>
+<style type="text/css" media="screen">
+    #editor {
+        width: 200px;
+        height: 100px;
+    }
+</style>
+<body>
+
+<!--<div id="editor">function foo(items) {-->
+    <!--var x = "All this is syntax highlighted";-->
+    <!--return x;-->
+    <!--}</div>-->
+
+<!--<script src="/ace-builds/src-noconflict/ace.js" type="text/javascript" charset="utf-8"></script>-->
+<!--<script>-->
+    <!--var editor = ace.edit("editor");-->
+    <!--editor.setTheme("ace/theme/monokai");-->
+    <!--editor.session.setMode("ace/mode/javascript");-->
+<!--</script>-->
+
+<script src="//d3js.org/d3.v3.min.js"></script>
+<script>
+
+    var width = document.body.clientWidth,
+        height = document.body.clientHeight;
+
+    var root;
+
+    var force = d3.layout.force()
+        .size([width, height])
+        .charge(-400)
+        .linkDistance(300)
+        .linkStrength(.5)
+        .on("tick", tick);
+
+    var drag = force.drag()
+        .on("dragstart", dragstart);
+
+    var svg = d3.select("body").append("svg")
+        .attr("width", width)
+        .attr("height", height);
+
+    var link = svg.selectAll(".link"),
+        node = svg.selectAll(".node"),
+        fObject = svg.selectAll("foreignObject"),
+        fileBubble = svg.selectAll(".file-bubble");
+
+    d3.json("data/col.json", function(error, json) {
+        if (error) throw error;
+
+        root = json;
+        update();
+    });
+
+    function update() {
+        var result = flatten(root.nodes, root.links);
+        var nodes = result.nodes, links = result.links;
+
+        console.log(root);
+        console.log(result);
+        console.log(nodes);
+        console.log(links);
+        // Restart the force layout.
+        force
+            .nodes(nodes)
+            .links(links)
+            .start();
+
+        //arrow
+        svg.append("svg:defs")
+            .append("svg:marker")
+            .attr("id", "arrow")
+            .attr("viewBox", "0 -5 10 10")
+            .attr("refX", 10)
+            .attr("refY", 0)
+            .attr("markerWidth", 10)
+            .attr("markerHeight", 10)
+            .attr("orient", "auto")
+            .append("path")
+            .attr("d", "M0,-5L10,0L0,5")
+            .attr("class","arrowHead");
+
+        // Update links.
+
+        link = link.data(links)
+            .attr("class", "link")
+            .attr("stroke-width", 1)
+            .attr("stroke", "black")
+            .attr("marker-end", "url(#arrow)");
+
+        link.exit().remove()
+
+        // link.enter().append("link");
+        link.enter().insert("line", ".node")
+            .attr("class", "link");
+
+        // Update nodes.
+        node = node.data(nodes)
+            .attr("class", "node")
+            .attr("transform", function (d) {
+                return "translate(" + d.x + "," + d.y + ")";
+            })
+            .on("dblclick", dblclick)
+            .call(drag);
+
+        node.exit().remove();
+
+        var nodeEnter = node.enter().append("g")
+            .attr("class", "node")
+            .on("click", click)
+            .call(force.drag);
+
+        fObject = nodeEnter.append("foreignObject");
+        // fObject = d3.selectAll("foreignObject");
+
+        fileBubble = fObject.append("xhtml:div")
+            .attr("class", "file-bubble");
+            // .attr("class", "file-bubble");
+
+        fileBubble.append("p")
+            .html(function (d) {
+                if (d.fileName) {
+                    var classItems = '';
+                    var i = 0;
+                    for (i = 0; i < d.classes.length; i++) {
+                        classItems += '<li>' + d.classes[i] + '</li>';
+                    }
+                    return '<div class="card-panel blue lighten-4" id="' + d.id + '">' +
+                        '<i class="material-icons right">insert_drive_file</i>' +
+                        '<span>' + d.fileName + '</span>' + '<ul>' + classItems + '</ul>' +
+                        '</div>';
+                }
+                if (d.methodName) {
+                    return '<div class="card-panel blue lighten-2" id="' + d.id + '">'
+                        + d.className + '::' + d.methodName +
+                        '</div>';
+                }
+                if (d.className) {
+                    return '<div class="card-panel blue lighten-3" id="' + d.id + '">'
+                        + d.className +
+                        '</div>';
+                }
+            });
+
+    }
+
+    function tick() {
+        link.attr("x1", function(d) { return d.source.x; })
+            .attr("y1", function(d) { return d.source.y; })
+            .attr("x2", function(d) { return d.target.x; })
+            .attr("y2", function(d) { return d.target.y; });
+
+        node.attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
+    }
+
+    function color(d) {
+        return d._children ? "#3182bd" // collapsed package
+            : d.children ? "#c6dbef" // expanded package
+                : "#fd8d3c"; // leaf node
+    }
+
+    // Toggle children on click.
+    function click(d) {
+        if (d3.event.defaultPrevented) return; // ignore drag
+        if (d.children) {
+            d._children = d.children;
+            d.children = null;
+        } else {
+            d.children = d._children;
+            d._children = null;
+        }
+        update();
+    }
+
+    // Returns a list of all nodes under the root.
+    function flatten(nodes, links) {
+        var newNodes = [], ids = {}, cnt = 0;
+
+        function recurse(node) {
+            if (node.children && node.children != null) {
+                for (let c of node.children) recurse(nodes[c]);
+            }
+            newNodes.push(node);
+            ids[node.id] = cnt++;
+        }
+
+        var roots = [];
+        for (let n of nodes) if (n.fileName) roots.push(n);
+        roots.forEach(recurse);
+        var newLinks = [];
+        for (let l of links) {
+            if (l.source in ids && l.target in ids) {
+                newLinks.push({
+                    source: ids[l.source],
+                    target: ids[l.target],
+                });
+            }
+        }
+        return {nodes: newNodes, links: newLinks};
+    }
+
+
+    function dblclick(d) {
+        // d3.select(this).classed("fixed", d.fixed = false);
+    }
+
+    function dragstart(d) {
+        // d3.select(this).classed("fixed", d.fixed = true);
+        console.log(d.fileName);
+        // $.get('http://localhost:3002/test', {name: d.fileName}, function (data) {
+        //     console.log(data);
+        // }, 'string');
+    }
+
+</script>
