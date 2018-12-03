@@ -24,7 +24,7 @@ router.post('/col', function(req, res, next) {
             id: map[k],
             fileName: k,
             classes: [],
-            children: [],
+            _children: [],
         });
     }
     for (let k of Object.keys(graphData)) {
@@ -35,8 +35,11 @@ router.post('/col', function(req, res, next) {
             });
         }
     }
+
+    const codeLen = 40;
+
     for (let k of Object.keys(classData)) {
-        for (let c of classData[k]) {
+        for (let c of Object.keys(classData[k])) {
             map[c] = cnt++;
             node = {
                 x: 0,
@@ -44,11 +47,12 @@ router.post('/col', function(req, res, next) {
                 id: map[c],
                 className: c,
                 methods: [],
-                children: [],
+                _children: [],
+                source: classData[k][c].split('\n').map(s => (s.length > codeLen ? s.substr(0, codeLen) : s)).join('</br>')
             };
             resData.nodes.push(node);
             resData.nodes[map[k]].classes.push(c);
-            resData.nodes[map[k]].children.push(node.id);
+            resData.nodes[map[k]]._children.push(node.id);
             resData.links.push({
                 source: map[k],
                 target: map[c],
@@ -58,8 +62,8 @@ router.post('/col', function(req, res, next) {
 
     console.log(resData);
     for (let k of Object.keys(methodData)) {
-        for (let c of methodData[k]) {
-            methodName = k + "." + c;
+        for (let c of Object.keys(methodData[k])) {
+            let methodName = k + "." + c;
             map[methodName] = cnt++;
             node = {
                 x: 0,
@@ -67,17 +71,18 @@ router.post('/col', function(req, res, next) {
                 id: map[methodName],
                 className: k,
                 methodName: c,
+                source: methodData[k][c].split('\n').map(s => (s.length > codeLen ? s.substr(0, codeLen) : s)).join('</br>')
             };
             resData.nodes.push(node);
             resData.nodes[map[k]].methods.push(c);
-            resData.nodes[map[k]].children.push(node.id);
+            resData.nodes[map[k]]._children.push(node.id);
             resData.links.push({
                 source: map[k],
                 target: map[methodName],
             });
         }
     }
-    fs.writeFile('../public/data/col.json', JSON.stringify(resData));
+    fs.writeFile('public/data/col.json', JSON.stringify(resData));
 
     res.json('{}');
 });

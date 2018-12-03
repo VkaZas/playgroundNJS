@@ -139,9 +139,9 @@
     function dragstart(d) {
         d3.select(this).classed("fixed", d.fixed = true);
         console.log(d.fileName);
-        $.get('http://localhost:3002/test', {name: d.fileName}, function (data) {
-            console.log(data);
-        }, 'string');
+        // $.get('http://localhost:3003/test', {name: d.fileName}, function (data) {
+        //     console.log(data);
+        // }, 'string');
     }
 
 </script>
